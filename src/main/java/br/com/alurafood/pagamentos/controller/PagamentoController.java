@@ -2,8 +2,10 @@ package br.com.alurafood.pagamentos.controller;
 
 import br.com.alurafood.pagamentos.dto.PagamentoDto;
 import br.com.alurafood.pagamentos.service.PagamentoService;
-import jakarta.validation.Valid;
-import jakarta.validation.constraints.NotNull;
+import javax.validation.Valid;
+import javax.validation.constraints.NotNull;
+
+import io.github.resilience4j.circuitbreaker.annotation.CircuitBreaker;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -50,6 +52,28 @@ public class PagamentoController {
     public ResponseEntity<PagamentoDto> remover(@PathVariable @NotNull Long id) {
         service.excluirPagamento(id);
         return ResponseEntity.noContent().build();
+    }
+
+    /*
+    Incluímos um @PatchMapping() com uma chamada para o ID do pagamento
+    ("/{id}/confirmar"). Quando o pagamento é confirmado, chamamos a service
+     passando o ID desse pagamento, ela que faz a integração com o client de pedido.
+     */
+    @PatchMapping("/{id}/confirmar")
+    /*
+    O circuit breaker é um padrão de software que monitora chamadas para
+    serviços externos e interrupte temporariamente essas chamadas em caso
+    de falhas repetidas, enquanto o fallback é um mecanismo alternativo que
+    é executado quando o circuit breaker está aberto ou quando a chamada
+    principal falha
+     */
+    @CircuitBreaker(name = "atualizaPedido", fallbackMethod = "pagamentoAutorizadoComIntegracaoPendente")
+    public void confirmarPagamento(@PathVariable @NotNull Long id){
+        service.confirmarPagamento(id);
+    }
+
+    public void pagamentoAutorizadoComIntegracaoPendente(Long id, Exception e){
+        service.alteraStatus(id);
     }
 
 }
